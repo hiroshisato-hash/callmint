@@ -217,4 +217,7 @@ const out = {
 };
 
 writeFileSync(join("generated", filename), JSON.stringify(out, null, 2));
+const mdFilename = `${date}_${filenameLabel}.md`;
+writeFileSync(join("generated", mdFilename), content.main);
 console.log(`Wrote generated/${filename}`);
+console.log(`Wrote generated/${mdFilename}`);
