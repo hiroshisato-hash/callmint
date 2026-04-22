@@ -35,20 +35,42 @@ if (!topic) {
   process.exit(1);
 }
 
+const SUBMIT_TOOL = {
+  name: "submit_content",
+  description:
+    "生成した4種類のコンテンツ（note記事・Xスレッド・Reels台本・Instagramキャプション）を構造化データとして提出する。必ずこのツールを呼び出して結果を返すこと。",
+  input_schema: {
+    type: "object",
+    properties: {
+      main: {
+        type: "string",
+        description: "note記事本文。Markdown形式。1500〜2000字。見出しあり。",
+      },
+      x_thread: {
+        type: "array",
+        items: { type: "string" },
+        minItems: 3,
+        maxItems: 5,
+        description: "Xスレッド。各要素は140字以内のツイート文字列。3〜5本。",
+      },
+      reels_script: {
+        type: "string",
+        description: "Instagram Reels台本。30〜60秒。シーン構成つき。",
+      },
+      instagram_caption: {
+        type: "string",
+        description: "Instagramキャプション。200〜400字。末尾にハッシュタグを含む。",
+      },
+    },
+    required: ["main", "x_thread", "reels_script", "instagram_caption"],
+  },
+};
+
 const prompt = `あなたは美容室経営者向けメディア「Callmint」の編集者です。
-以下のテーマで、note記事・Xスレッド・Instagram Reels台本・Instagramキャプションを生成してください。
+以下のテーマで、note記事・Xスレッド・Instagram Reels台本・Instagramキャプションを生成し、submit_content ツールを呼び出して提出してください。
 
 テーマ: ${topic.title}
-切り口: ${topic.angle}
-
-出力は次のJSONオブジェクトのみ。前置き・後書き・コードブロック記法は付けないこと。
-
-{
-  "main": "note記事本文（Markdown、1500〜2000字、見出しあり）",
-  "x_thread": ["ツイート1（140字以内）", "ツイート2", "ツイート3"],
-  "reels_script": "Instagram Reels台本（30〜60秒、シーン構成つき）",
-  "instagram_caption": "Instagramキャプション（200〜400字、ハッシュタグ含む）"
-}`;
+切り口: ${topic.angle}`;
 
 const res = await fetch("https://api.anthropic.com/v1/messages", {
   method: "POST",
@@ -60,6 +82,8 @@ const res = await fetch("https://api.anthropic.com/v1/messages", {
   body: JSON.stringify({
     model: MODEL,
     max_tokens: 4096,
+    tools: [SUBMIT_TOOL],
+    tool_choice: { type: "tool", name: "submit_content" },
     messages: [{ role: "user", content: prompt }],
   }),
 });
@@ -71,20 +95,14 @@ if (!res.ok) {
 }
 
 const data = await res.json();
-const text = data?.content?.[0]?.text;
-if (!text) {
-  console.error("No text in API response:", JSON.stringify(data));
+const toolUse = data?.content?.find((c) => c.type === "tool_use");
+if (!toolUse?.input) {
+  console.error("No tool_use block in API response:");
+  console.error(JSON.stringify(data, null, 2));
   process.exit(1);
 }
 
-let content;
-try {
-  content = JSON.parse(text);
-} catch (e) {
-  console.error("Failed to parse model output as JSON. Raw text:");
-  console.error(text);
-  process.exit(1);
-}
+const content = toolUse.input;
 
 const date = new Date().toISOString().slice(0, 10);
 const filename = `${date}_ORIGINAL_${TOPIC}.json`;
