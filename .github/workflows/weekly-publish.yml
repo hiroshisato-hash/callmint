@@ -1,0 +1,76 @@
+name: Content Shark v2 - Weekly Publish
+
+on:
+  workflow_dispatch:
+    inputs:
+      topic:
+        description: "Topic key"
+        required: true
+        default: kyakutanka_up
+        type: choice
+        options:
+          - kyakutanka_up
+          - repeat_rate
+          - sns_shukyaku
+          - callmint_jirei
+  schedule:
+    # JST 09:30 = UTC 00:30. Auto-generation days: Mon / Wed / Fri / Sun.
+    - cron: "30 0 * * 1"
+    - cron: "30 0 * * 3"
+    - cron: "30 0 * * 5"
+    - cron: "30 0 * * 0"
+
+permissions:
+  contents: write
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install (no deps; native fetch)
+        run: npm install --no-audit --no-fund
+
+      - name: Determine topic
+        id: topic
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TOPIC="${{ inputs.topic }}"
+          else
+            DOW=$(date -u +%u)
+            case "$DOW" in
+              1) TOPIC=kyakutanka_up ;;
+              3) TOPIC=repeat_rate ;;
+              5) TOPIC=sns_shukyaku ;;
+              7) TOPIC=callmint_jirei ;;
+              *) TOPIC=kyakutanka_up ;;
+            esac
+          fi
+          echo "topic=$TOPIC" >> "$GITHUB_OUTPUT"
+          echo "Selected topic: $TOPIC"
+
+      - name: Generate content
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          TOPIC: ${{ steps.topic.outputs.topic }}
+        run: node scripts/generate.mjs
+
+      - name: Commit & push
+        env:
+          TOPIC: ${{ steps.topic.outputs.topic }}
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add generated/
+          if git diff --cached --quiet; then
+            echo "Nothing to commit."
+          else
+            git commit -m "chore: auto-generate content $(date -u +%Y-%m-%d) [$TOPIC]"
+            git push
+          fi
