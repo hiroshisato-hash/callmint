@@ -58,6 +58,7 @@ jobs:
       - name: Generate content
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          MODE: original
           TOPIC: ${{ steps.topic.outputs.topic }}
         run: node scripts/generate.mjs
 
@@ -74,3 +75,18 @@ jobs:
             git commit -m "chore: auto-generate content $(date -u +%Y-%m-%d) [$TOPIC]"
             git push
           fi
+
+      - name: Notify Discord on failure
+        if: ${{ failure() }}
+        env:
+          WEBHOOK: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          TOPIC: ${{ steps.topic.outputs.topic }}
+        run: |
+          if [ -z "$WEBHOOK" ]; then
+            echo "DISCORD_WEBHOOK_URL not set — skipping notification."
+            exit 0
+          fi
+          RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          BODY=$(printf '{"content":"❌ **Content Shark v2 失敗**\\n- Workflow: %s\\n- Topic: %s\\n- Trigger: %s\\n- Run: %s"}' \
+            "${{ github.workflow }}" "${TOPIC:-?}" "${{ github.event_name }}" "$RUN_URL")
+          curl -sS -H "Content-Type: application/json" -d "$BODY" "$WEBHOOK" || true
