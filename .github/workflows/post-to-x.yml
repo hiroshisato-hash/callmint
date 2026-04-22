@@ -15,9 +15,9 @@ on:
         options:
           - "false"
           - "true"
-  # 自動投稿を有効化する場合は下のコメントを外す（JST 10:00 = UTC 01:00）
-  # schedule:
-  #   - cron: "0 1 * * *"
+  schedule:
+    # JST 10:00 = UTC 01:00. 毎朝1回、最新未投稿JSONを自動投稿する
+    - cron: "0 1 * * *"
 
 permissions:
   contents: write
