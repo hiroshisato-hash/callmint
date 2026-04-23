@@ -49,7 +49,27 @@ const cachedSystem = [
   },
 ];
 
-async function callClaude({ model, userPrompt, tool, maxTokens = 4096 }) {
+// Defensive: if the model stringified an array field, recover it.
+function coerceArrayFields(obj, fieldNames) {
+  if (!obj || typeof obj !== "object") return obj;
+  for (const field of fieldNames) {
+    const v = obj[field];
+    if (typeof v === "string") {
+      try {
+        const parsed = JSON.parse(v);
+        if (Array.isArray(parsed)) {
+          obj[field] = parsed;
+          console.warn(`[coerce] '${field}' was returned as JSON string, recovered to array.`);
+        }
+      } catch (e) {
+        console.warn(`[coerce] '${field}' is a string but not valid JSON; leaving as-is.`);
+      }
+    }
+  }
+  return obj;
+}
+
+async function callClaude({ model, userPrompt, tool, maxTokens = 4096, arrayFields = [] }) {
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
@@ -75,7 +95,8 @@ async function callClaude({ model, userPrompt, tool, maxTokens = 4096 }) {
   if (!toolUse?.input) {
     throw new Error(`No tool_use in response: ${JSON.stringify(data)}`);
   }
-  return { result: toolUse.input, usage: data.usage, model };
+  const result = coerceArrayFields(toolUse.input, arrayFields);
+  return { result, usage: data.usage, model };
 }
 
 // ---- tool schemas ----
@@ -193,7 +214,8 @@ const CONTENT_TOOL = {
         items: { type: "string" },
         minItems: 4,
         maxItems: 5,
-        description: "Xスレッド。1本目フック+🧵、最終本noteへの誘導。各140字以内。",
+        description:
+          "Xスレッド。1本目フック+🧵、最終本noteへの誘導。各140字以内。**この値は文字列の配列として直接返すこと。配列を JSON 文字列にエンコードして返してはいけない。**",
       },
       reels_script: {
         type: "string",
@@ -236,7 +258,8 @@ const THREAD_TOOL = {
         minItems: 4,
         maxItems: 5,
         items: { type: "string" },
-        description: "各ツイート140字以内。1本目フック、最終本でCTA or 締め。",
+        description:
+          "各ツイート140字以内。1本目フック、最終本でCTA or 締め。**この値は文字列の配列として直接返すこと。配列を JSON 文字列にエンコードして返してはいけない。**",
       },
       topic_label: { type: "string" },
     },
@@ -329,6 +352,7 @@ ${outline.result.title_candidates.map((t, i) => `${i + 1}. ${t}`).join("\n")}
 - 末尾Callmint誘導ブロックは戦略の cta_angle を踏まえる`,
     tool: CONTENT_TOOL,
     maxTokens: 4096,
+    arrayFields: ["x_thread"],
   });
   console.log(`  → draft main: ${draft.result.main.length}字, x_thread: ${draft.result.x_thread.length}本`);
 
@@ -415,6 +439,7 @@ ${topic.title}（${topic.angle}）
 submit_thread ツールで提出。topic_label には「${topic.title}」を入れる。`,
     tool: THREAD_TOOL,
     maxTokens: 2000,
+    arrayFields: ["tweets"],
   });
   console.log(`  → ${result.result.tweets.length} tweets`);
   return { ...result, topic_meta: topic };
@@ -441,9 +466,10 @@ ${SINGLE_TWEET_TOPICS.join(" / ")}
 - 各140字以内厳守
 - 1日2本×7日 で投稿される想定なので、時刻違いで連投してもうるさくない
 
-submit_tweet_pool ツールで提出。`,
+submit_tweet_pool ツールで提出。**tweets フィールドは必ずオブジェクトの配列として直接返すこと（JSON文字列化禁止）。**`,
     tool: TWEET_POOL_TOOL,
     maxTokens: 3500,
+    arrayFields: ["tweets"],
   });
   console.log(`  → ${result.result.tweets.length} tweets generated`);
   return result;

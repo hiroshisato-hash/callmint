@@ -89,6 +89,22 @@ async function postTweet(text, inReplyToTweetId = null) {
 
 // ---- file discovery ----
 
+// Defensive: handle JSON files where `tweets` was accidentally stringified by the LLM.
+function coerceTweets(j) {
+  if (j && typeof j.tweets === "string") {
+    try {
+      const parsed = JSON.parse(j.tweets);
+      if (Array.isArray(parsed)) {
+        j.tweets = parsed;
+        console.warn(`[coerce] tweets recovered from JSON-string`);
+      }
+    } catch {
+      // leave as-is; will fail downstream with a clear error
+    }
+  }
+  return j;
+}
+
 function findLatestWeekDir() {
   const root = join("generated", "weeks");
   try {
@@ -135,7 +151,7 @@ async function runThreadMode() {
   let target = null;
 
   if (FILE_ENV) {
-    const j = JSON.parse(readFileSync(FILE_ENV, "utf-8"));
+    const j = coerceTweets(JSON.parse(readFileSync(FILE_ENV, "utf-8")));
     if (j.posted_to_x) {
       console.log(`Already posted: ${FILE_ENV}`);
       return;
@@ -154,7 +170,7 @@ async function runThreadMode() {
       const dayKey = dow === 4 ? "thursday" : "monday";
       const path = join(weekDir, `thread-${dayKey}.json`);
       try {
-        const j = JSON.parse(readFileSync(path, "utf-8"));
+        const j = coerceTweets(JSON.parse(readFileSync(path, "utf-8")));
         if (!j.posted_to_x && Array.isArray(j.tweets) && j.tweets.length) {
           target = { path, tweets: j.tweets, json: j };
         }
