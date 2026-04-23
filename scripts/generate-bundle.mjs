@@ -254,21 +254,18 @@ const X_ARTICLE_TOOL = {
 
 const THREAD_TOOL = {
   name: "submit_thread",
-  description: "Xスレッド（4〜5ツイート）を提出",
+  description: "Xスレッド（4〜5ツイート）を提出。配列ではなく個別フィールドで返す。",
   input_schema: {
     type: "object",
     properties: {
-      tweets: {
-        type: "array",
-        minItems: 4,
-        maxItems: 5,
-        items: { type: "string" },
-        description:
-          "各ツイート140字以内。1本目フック、最終本でCTA or 締め。**この値は文字列の配列として直接返すこと。配列を JSON 文字列にエンコードして返してはいけない。**",
-      },
+      tweet_1: { type: "string", description: "1本目（強フック+🧵、140字以内）" },
+      tweet_2: { type: "string", description: "2本目（140字以内）" },
+      tweet_3: { type: "string", description: "3本目（140字以内）" },
+      tweet_4: { type: "string", description: "4本目 or 締め（140字以内）" },
+      tweet_5: { type: "string", description: "5本目（任意、140字以内、不要なら空文字）" },
       topic_label: { type: "string" },
     },
-    required: ["tweets", "topic_label"],
+    required: ["tweet_1", "tweet_2", "tweet_3", "tweet_4", "topic_label"],
   },
 };
 
@@ -444,12 +441,22 @@ ${topic.title}（${topic.angle}）
 - note誘導はしない（単発スレ）
 - 各140字以内厳守
 
-submit_thread ツールで提出。topic_label には「${topic.title}」を入れる。`,
+submit_thread ツールで提出。topic_label には「${topic.title}」を入れる。
+
+**重要**: tweet_1, tweet_2, tweet_3, tweet_4, tweet_5 はそれぞれ個別の文字列フィールドです。配列ではなく個別の文字列として返してください。`,
     tool: THREAD_TOOL,
     maxTokens: 2000,
   });
-  console.log(`  → ${result.result.tweets.length} tweets`);
-  return { ...result, topic_meta: topic };
+  // Convert individual tweet_N fields back to an array for downstream code
+  const tweets = [
+    result.result.tweet_1,
+    result.result.tweet_2,
+    result.result.tweet_3,
+    result.result.tweet_4,
+    result.result.tweet_5,
+  ].filter((t) => t && String(t).trim());
+  console.log(`  → ${tweets.length} tweets`);
+  return { result: { ...result.result, tweets }, usage: result.usage, model: result.model, topic_meta: topic };
 }
 
 async function generateTweetPool() {
