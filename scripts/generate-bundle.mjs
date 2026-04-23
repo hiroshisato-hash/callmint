@@ -49,27 +49,28 @@ const cachedSystem = [
   },
 ];
 
-// Defensive: if the model stringified an array field, recover it.
-function coerceArrayFields(obj, fieldNames) {
-  if (!obj || typeof obj !== "object") return obj;
-  for (const field of fieldNames) {
-    const v = obj[field];
-    if (typeof v === "string") {
+// Defensive: deeply walk the result and JSON.parse any string that looks like JSON.
+// Handles cases where the LLM stringifies arrays or nested objects despite tool schema.
+function deepCoerceStrings(value) {
+  if (Array.isArray(value)) return value.map(deepCoerceStrings);
+  if (value && typeof value === "object") {
+    for (const k of Object.keys(value)) value[k] = deepCoerceStrings(value[k]);
+    return value;
+  }
+  if (typeof value === "string") {
+    const t = value.trim();
+    if ((t.startsWith("{") && t.endsWith("}")) || (t.startsWith("[") && t.endsWith("]"))) {
       try {
-        const parsed = JSON.parse(v);
-        if (Array.isArray(parsed)) {
-          obj[field] = parsed;
-          console.warn(`[coerce] '${field}' was returned as JSON string, recovered to array.`);
-        }
-      } catch (e) {
-        console.warn(`[coerce] '${field}' is a string but not valid JSON; leaving as-is.`);
+        return deepCoerceStrings(JSON.parse(t));
+      } catch {
+        // not parseable — leave as raw string
       }
     }
   }
-  return obj;
+  return value;
 }
 
-async function callClaude({ model, userPrompt, tool, maxTokens = 4096, arrayFields = [] }) {
+async function callClaude({ model, userPrompt, tool, maxTokens = 4096, retries = 1 }) {
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
@@ -93,9 +94,13 @@ async function callClaude({ model, userPrompt, tool, maxTokens = 4096, arrayFiel
   const data = await res.json();
   const toolUse = data?.content?.find((c) => c.type === "tool_use");
   if (!toolUse?.input) {
+    if (retries > 0) {
+      console.warn(`[retry] No tool_use in response, retrying (${retries} left)...`);
+      return callClaude({ model, userPrompt, tool, maxTokens, retries: retries - 1 });
+    }
     throw new Error(`No tool_use in response: ${JSON.stringify(data)}`);
   }
-  const result = coerceArrayFields(toolUse.input, arrayFields);
+  const result = deepCoerceStrings(toolUse.input);
   return { result, usage: data.usage, model };
 }
 
@@ -323,6 +328,10 @@ ${JSON.stringify(strategy.result, null, 2)}
     tool: OUTLINE_TOOL,
     maxTokens: 2500,
   });
+  if (!outline.result.outline?.h2_sections) {
+    console.error("Outline result malformed:", JSON.stringify(outline.result, null, 2));
+    throw new Error("Outline missing outline.h2_sections");
+  }
   console.log(`  → 5 titles, ${outline.result.outline.h2_sections.length} sections`);
 
   console.log(`[3/5] Title Selector (${MODEL_OPUS})...`);
@@ -352,7 +361,6 @@ ${outline.result.title_candidates.map((t, i) => `${i + 1}. ${t}`).join("\n")}
 - 末尾Callmint誘導ブロックは戦略の cta_angle を踏まえる`,
     tool: CONTENT_TOOL,
     maxTokens: 4096,
-    arrayFields: ["x_thread"],
   });
   console.log(`  → draft main: ${draft.result.main.length}字, x_thread: ${draft.result.x_thread.length}本`);
 
@@ -439,7 +447,6 @@ ${topic.title}（${topic.angle}）
 submit_thread ツールで提出。topic_label には「${topic.title}」を入れる。`,
     tool: THREAD_TOOL,
     maxTokens: 2000,
-    arrayFields: ["tweets"],
   });
   console.log(`  → ${result.result.tweets.length} tweets`);
   return { ...result, topic_meta: topic };
@@ -469,7 +476,6 @@ ${SINGLE_TWEET_TOPICS.join(" / ")}
 submit_tweet_pool ツールで提出。**tweets フィールドは必ずオブジェクトの配列として直接返すこと（JSON文字列化禁止）。**`,
     tool: TWEET_POOL_TOOL,
     maxTokens: 3500,
-    arrayFields: ["tweets"],
   });
   console.log(`  → ${result.result.tweets.length} tweets generated`);
   return result;
