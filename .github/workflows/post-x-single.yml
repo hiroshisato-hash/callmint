@@ -1,24 +1,23 @@
-name: Content Shark v2 - Post to X (Legacy / escape hatch)
-
-# Phase γ移行に伴い cron は無効化済。
-# 定時投稿は post-x-thread.yml と post-x-single.yml が担当。
-# このワークフローは「特定の旧構造JSONを単発で投稿したい」場合のための手動トリガのみ残す。
+name: Content Shark v2 - Post X Single
 
 on:
   workflow_dispatch:
     inputs:
-      file:
-        description: "生成済みJSONのパス（空欄なら最新未投稿を自動選択）"
+      week_dir:
+        description: "週ディレクトリ（空欄なら最新週から取り出す）"
         required: false
         type: string
       dry_run:
-        description: "true にすると実際にツイートせずログだけ出す"
+        description: "true で投稿せずログだけ"
         required: false
         default: "false"
         type: choice
-        options:
-          - "false"
-          - "true"
+        options: ["false", "true"]
+  schedule:
+    # JST 朝08:00 = UTC 前日23:00
+    - cron: "0 23 * * *"
+    # JST 晩21:00 = UTC 同日12:00
+    - cron: "0 12 * * *"
 
 permissions:
   contents: write
@@ -34,14 +33,15 @@ jobs:
         with:
           node-version: "20"
 
-      - name: Post to X
+      - name: Post single tweet
         env:
+          MODE: single
+          WEEK_DIR: ${{ inputs.week_dir }}
+          DRY_RUN: ${{ inputs.dry_run }}
           X_API_KEY: ${{ secrets.X_API_KEY }}
           X_API_KEY_SECRET: ${{ secrets.X_API_KEY_SECRET }}
           X_ACCESS_TOKEN: ${{ secrets.X_ACCESS_TOKEN }}
           X_ACCESS_TOKEN_SECRET: ${{ secrets.X_ACCESS_TOKEN_SECRET }}
-          FILE: ${{ inputs.file }}
-          DRY_RUN: ${{ inputs.dry_run }}
         run: node scripts/post-to-x.mjs
 
       - name: Commit posted marker
@@ -53,7 +53,7 @@ jobs:
           if git diff --cached --quiet; then
             echo "Nothing to commit."
           else
-            git commit -m "chore: mark posted_to_x $(date -u +%Y-%m-%d)"
+            git commit -m "chore: mark single posted_to_x $(date -u +%Y-%m-%dT%H:%M)"
             git push
           fi
 
@@ -62,11 +62,8 @@ jobs:
         env:
           WEBHOOK: ${{ secrets.DISCORD_WEBHOOK_URL }}
         run: |
-          if [ -z "$WEBHOOK" ]; then
-            echo "DISCORD_WEBHOOK_URL not set — skipping notification."
-            exit 0
-          fi
+          if [ -z "$WEBHOOK" ]; then exit 0; fi
           RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-          BODY=$(printf '{"content":"❌ **Content Shark v2 (Post to X) 失敗**\\n- Trigger: %s\\n- Run: %s"}' \
+          BODY=$(printf '{"content":"❌ **Post X Single 失敗**\\n- Trigger: %s\\n- Run: %s"}' \
             "${{ github.event_name }}" "$RUN_URL")
           curl -sS -H "Content-Type: application/json" -d "$BODY" "$WEBHOOK" || true

@@ -1,4 +1,7 @@
-name: Content Shark v2 - Weekly Publish
+name: Content Shark v2 - Single Topic Publish (Legacy / escape hatch)
+
+# Phase γ移行に伴い cron は無効化済。weekly-bundle.yml が定時生成を担当する。
+# このワークフローは「特定トピックを単発で再生成したい」場合のための手動トリガのみ残す。
 
 on:
   workflow_dispatch:
@@ -13,12 +16,6 @@ on:
           - repeat_rate
           - sns_shukyaku
           - callmint_jirei
-  schedule:
-    # JST 09:30 = UTC 00:30. Auto-generation days: Mon / Wed / Fri / Sun.
-    - cron: "30 0 * * 1"
-    - cron: "30 0 * * 3"
-    - cron: "30 0 * * 5"
-    - cron: "30 0 * * 0"
 
 permissions:
   contents: write

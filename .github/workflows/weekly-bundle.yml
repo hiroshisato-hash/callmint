@@ -1,0 +1,64 @@
+name: Content Shark v2 - Weekly Bundle (Phase γ)
+
+on:
+  workflow_dispatch:
+    inputs:
+      note_topic:
+        description: "noteのテーマ強制指定（空欄なら3週ローテで自動）"
+        required: false
+        default: ""
+        type: choice
+        options:
+          - ""
+          - kyakutanka_up
+          - repeat_rate
+          - sns_shukyaku
+  schedule:
+    # JST 日曜22:00 = UTC 日曜13:00。月曜公開のための週次大量生成。
+    - cron: "0 13 * * 0"
+
+permissions:
+  contents: write
+
+jobs:
+  bundle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install
+        run: npm install --no-audit --no-fund
+
+      - name: Generate weekly bundle (Phase γ + X Article + Thursday Thread + 14 singles)
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          NOTE_TOPIC: ${{ inputs.note_topic }}
+        run: node scripts/generate-bundle.mjs
+
+      - name: Commit & push
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add generated/
+          if git diff --cached --quiet; then
+            echo "Nothing to commit."
+          else
+            git commit -m "chore: weekly bundle for week starting $(date -u +%Y-%m-%d)"
+            git push
+          fi
+
+      - name: Notify Discord on failure
+        if: ${{ failure() }}
+        env:
+          WEBHOOK: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: |
+          if [ -z "$WEBHOOK" ]; then exit 0; fi
+          RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          BODY=$(printf '{"content":"❌ **Weekly Bundle 失敗**\\n- Trigger: %s\\n- Run: %s"}' \
+            "${{ github.event_name }}" "$RUN_URL")
+          curl -sS -H "Content-Type: application/json" -d "$BODY" "$WEBHOOK" || true

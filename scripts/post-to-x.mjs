@@ -1,13 +1,16 @@
-import { readFileSync, writeFileSync, readdirSync } from "node:fs";
+import { readFileSync, writeFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { createHmac, randomBytes } from "node:crypto";
+
+const MODE = (process.env.MODE || "thread").toLowerCase(); // "thread" | "single"
+const FILE_ENV = process.env.FILE || "";
+const WEEK_DIR_ENV = process.env.WEEK_DIR || "";
+const DRY_RUN = process.env.DRY_RUN === "true";
 
 const API_KEY = process.env.X_API_KEY;
 const API_KEY_SECRET = process.env.X_API_KEY_SECRET;
 const ACCESS_TOKEN = process.env.X_ACCESS_TOKEN;
 const ACCESS_TOKEN_SECRET = process.env.X_ACCESS_TOKEN_SECRET;
-const FILE_ENV = process.env.FILE || "";
-const DRY_RUN = process.env.DRY_RUN === "true";
 
 if (!DRY_RUN) {
   const missing = [
@@ -24,7 +27,8 @@ if (!DRY_RUN) {
   }
 }
 
-// RFC 3986 percent-encoding (stricter than encodeURIComponent).
+// ---- OAuth 1.0a signing ----
+
 function pct(s) {
   return encodeURIComponent(String(s)).replace(
     /[!*'()]/g,
@@ -77,71 +81,172 @@ async function postTweet(text, inReplyToTweetId = null) {
     body: JSON.stringify(body),
   });
   const responseText = await res.text();
-  if (!res.ok) {
-    throw new Error(`X API ${res.status}: ${responseText}`);
-  }
+  if (!res.ok) throw new Error(`X API ${res.status}: ${responseText}`);
   const data = JSON.parse(responseText);
-  if (!data?.data?.id) {
-    throw new Error(`Unexpected X API response: ${responseText}`);
-  }
+  if (!data?.data?.id) throw new Error(`Unexpected X API response: ${responseText}`);
   return data.data.id;
 }
 
-function findLatestUnpostedFile() {
-  const files = readdirSync("generated")
-    .filter((f) => f.endsWith(".json"))
-    .sort()
-    .reverse();
-  for (const f of files) {
-    const p = join("generated", f);
-    try {
-      const j = JSON.parse(readFileSync(p, "utf-8"));
-      if (j?.posted_to_x) continue;
-      if (!Array.isArray(j?.content?.x_thread) || j.content.x_thread.length === 0) continue;
-      return p;
-    } catch (_) {
-      continue;
+// ---- file discovery ----
+
+function findLatestWeekDir() {
+  const root = join("generated", "weeks");
+  try {
+    const dirs = readdirSync(root)
+      .filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d))
+      .filter((d) => statSync(join(root, d)).isDirectory())
+      .sort()
+      .reverse();
+    return dirs.length ? join(root, dirs[0]) : null;
+  } catch {
+    return null;
+  }
+}
+
+function findLegacyLatestUnposted() {
+  // Fallback for old generated/*.json files at root
+  const dir = "generated";
+  try {
+    const files = readdirSync(dir)
+      .filter((f) => f.endsWith(".json"))
+      .sort()
+      .reverse();
+    for (const f of files) {
+      const p = join(dir, f);
+      try {
+        const j = JSON.parse(readFileSync(p, "utf-8"));
+        if (j?.posted_to_x) continue;
+        const tweets = j?.content?.x_thread || j?.tweets;
+        if (!Array.isArray(tweets) || tweets.length === 0) continue;
+        return { path: p, tweets, structure: "legacy" };
+      } catch {
+        continue;
+      }
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+// ---- thread mode ----
+
+async function runThreadMode() {
+  let target = null;
+
+  if (FILE_ENV) {
+    const j = JSON.parse(readFileSync(FILE_ENV, "utf-8"));
+    if (j.posted_to_x) {
+      console.log(`Already posted: ${FILE_ENV}`);
+      return;
+    }
+    const tweets = j.tweets || j.content?.x_thread;
+    if (!Array.isArray(tweets) || tweets.length === 0) {
+      throw new Error(`No tweets in ${FILE_ENV}`);
+    }
+    target = { path: FILE_ENV, tweets, json: j };
+  } else {
+    // Try latest week dir first, then legacy
+    const weekDir = WEEK_DIR_ENV || findLatestWeekDir();
+    if (weekDir) {
+      // Pick the right thread for today (Mon=monday, Thu=thursday)
+      const dow = new Date(Date.now() + 9 * 60 * 60 * 1000).getUTCDay(); // JST
+      const dayKey = dow === 4 ? "thursday" : "monday";
+      const path = join(weekDir, `thread-${dayKey}.json`);
+      try {
+        const j = JSON.parse(readFileSync(path, "utf-8"));
+        if (!j.posted_to_x && Array.isArray(j.tweets) && j.tweets.length) {
+          target = { path, tweets: j.tweets, json: j };
+        }
+      } catch {
+        // Thread file missing or bad; fallthrough
+      }
+    }
+    if (!target) {
+      const legacy = findLegacyLatestUnposted();
+      if (legacy) {
+        const j = JSON.parse(readFileSync(legacy.path, "utf-8"));
+        target = { path: legacy.path, tweets: legacy.tweets, json: j };
+      }
     }
   }
-  return null;
+
+  if (!target) {
+    console.log("No unposted thread found. Nothing to do.");
+    return;
+  }
+
+  console.log(`Target: ${target.path} (${target.tweets.length} tweets)${DRY_RUN ? " DRY_RUN" : ""}`);
+  const tweetIds = [];
+  let prevId = null;
+  for (let i = 0; i < target.tweets.length; i++) {
+    const text = String(target.tweets[i]).trim();
+    if (!text) continue;
+    console.log(`Posting ${i + 1}/${target.tweets.length} (${text.length}字)...`);
+    const id = await postTweet(text, prevId);
+    tweetIds.push(id);
+    prevId = id;
+    if (i < target.tweets.length - 1) await new Promise((r) => setTimeout(r, 1500));
+  }
+
+  if (!DRY_RUN) {
+    target.json.posted_to_x = true;
+    target.json.x_thread_tweet_ids = tweetIds;
+    target.json.x_posted_at = new Date().toISOString();
+    writeFileSync(target.path, JSON.stringify(target.json, null, 2));
+  }
+  console.log(`Done. Tweet IDs: ${tweetIds.join(", ")}`);
 }
 
-const filePath = FILE_ENV || findLatestUnpostedFile();
-if (!filePath) {
-  console.log("No unposted generated/*.json with x_thread found. Nothing to do.");
-  process.exit(0);
+// ---- single mode ----
+
+async function runSingleMode() {
+  const weekDir = WEEK_DIR_ENV || findLatestWeekDir();
+  if (!weekDir) {
+    console.log("No week directory found. Nothing to do.");
+    return;
+  }
+  const singlesPath = join(weekDir, "singles.json");
+  let pool;
+  try {
+    pool = JSON.parse(readFileSync(singlesPath, "utf-8"));
+  } catch (e) {
+    console.log(`No singles.json at ${singlesPath}: ${e.message}`);
+    return;
+  }
+  const tweets = pool.tweets || [];
+  const idx = tweets.findIndex((t) => !t.posted_to_x);
+  if (idx === -1) {
+    console.log(`All ${tweets.length} singles already posted in ${singlesPath}.`);
+    return;
+  }
+
+  const t = tweets[idx];
+  console.log(
+    `Single ${idx + 1}/${tweets.length} [${t.mode}/${t.topic_label}] (${t.text.length}字)${DRY_RUN ? " DRY_RUN" : ""}`,
+  );
+  const id = await postTweet(t.text);
+
+  if (!DRY_RUN) {
+    tweets[idx] = {
+      ...t,
+      posted_to_x: true,
+      tweet_id: id,
+      x_posted_at: new Date().toISOString(),
+    };
+    pool.tweets = tweets;
+    writeFileSync(singlesPath, JSON.stringify(pool, null, 2));
+  }
+  console.log(`Done. Tweet ID: ${id}`);
 }
 
-console.log(`Target file: ${filePath}${DRY_RUN ? " (DRY_RUN)" : ""}`);
-const data = JSON.parse(readFileSync(filePath, "utf-8"));
+// ---- entry ----
 
-if (data.posted_to_x) {
-  console.log(`Already posted: ${filePath}`);
-  process.exit(0);
-}
-const thread = data?.content?.x_thread;
-if (!Array.isArray(thread) || thread.length === 0) {
-  console.error(`No x_thread in ${filePath}`);
+if (MODE === "thread") {
+  await runThreadMode();
+} else if (MODE === "single") {
+  await runSingleMode();
+} else {
+  console.error(`Unknown MODE: ${MODE}. Expected: thread | single`);
   process.exit(1);
 }
-
-const tweetIds = [];
-let prevId = null;
-for (let i = 0; i < thread.length; i++) {
-  const text = String(thread[i]).trim();
-  if (!text) continue;
-  console.log(`Posting tweet ${i + 1}/${thread.length} (${text.length}字)...`);
-  const id = await postTweet(text, prevId);
-  tweetIds.push(id);
-  prevId = id;
-  if (i < thread.length - 1) await new Promise((r) => setTimeout(r, 1500));
-}
-
-if (!DRY_RUN) {
-  data.posted_to_x = true;
-  data.x_thread_tweet_ids = tweetIds;
-  data.x_posted_at = new Date().toISOString();
-  writeFileSync(filePath, JSON.stringify(data, null, 2));
-  console.log(`Marked posted: ${filePath}`);
-}
-console.log(`Done. Tweet IDs: ${tweetIds.join(", ")}`);
