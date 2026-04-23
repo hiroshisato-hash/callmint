@@ -14,8 +14,8 @@ on:
         type: choice
         options: ["false", "true"]
   schedule:
-    # JST 月曜10:00 = UTC 月曜01:00 (note誘導スレッド)
-    - cron: "0 1 * * 1"
+    # JST 火曜10:00 = UTC 火曜01:00 (note誘導スレッド。月曜にユーザーがnote手動投稿後の翌日)
+    - cron: "0 1 * * 2"
     # JST 木曜10:00 = UTC 木曜01:00 (独立スレッド)
     - cron: "0 1 * * 4"
 
