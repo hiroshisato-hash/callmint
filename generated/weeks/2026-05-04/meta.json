@@ -1,0 +1,14 @@
+{
+  "generated_at": "2026-05-03T15:38:13.436Z",
+  "week_start": "2026-05-04",
+  "note_topic": "sns_shukyaku",
+  "note_title": "なぜあなたのサロンはSNSで映えているのに予約が増えないのか",
+  "x_article_title": "週4投稿しても予約が来ないサロンが見落としている、たった一つのズレ",
+  "thursday_thread_topic": "店舗ブランディング",
+  "pipeline": "phase-gamma",
+  "models_used": [
+    "claude-haiku-4-5-20251001",
+    "claude-sonnet-4-6",
+    "claude-opus-4-7"
+  ]
+}
