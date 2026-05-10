@@ -1,0 +1,14 @@
+{
+  "generated_at": "2026-05-10T16:16:52.228Z",
+  "week_start": "2026-05-11",
+  "note_topic": "kyakutanka_up",
+  "note_title": "「値上げ怖い」を卒業する日。美容室が失客を最小化しながら単価を上げる方法",
+  "x_article_title": "値上げで客が減るのは「金額」のせいじゃない——失客ゼロで客単価を上げる3ステップ",
+  "thursday_thread_topic": "チーム運営",
+  "pipeline": "phase-gamma",
+  "models_used": [
+    "claude-haiku-4-5-20251001",
+    "claude-sonnet-4-6",
+    "claude-opus-4-7"
+  ]
+}
