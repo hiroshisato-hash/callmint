@@ -1,0 +1,14 @@
+{
+  "generated_at": "2026-05-17T16:19:49.886Z",
+  "week_start": "2026-05-18",
+  "note_topic": "repeat_rate",
+  "note_title": "月商が伸びないのは新規が少ないせい？実は離脱が原因かも",
+  "x_article_title": "リピーターが消えるサロンには「接点の空白」がある——今日直せる3つの構造的ミス",
+  "thursday_thread_topic": "予約管理",
+  "pipeline": "phase-gamma",
+  "models_used": [
+    "claude-haiku-4-5-20251001",
+    "claude-sonnet-4-6",
+    "claude-opus-4-7"
+  ]
+}
