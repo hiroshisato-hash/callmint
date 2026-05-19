@@ -6,7 +6,7 @@ import {
   NOTE_ROTATION,
   THURSDAY_THREAD_TOPICS,
   SINGLE_TWEET_TOPICS,
-  MASCOT_CHARACTER,
+  SINGLE_TWEET_VOICE,
 } from "./brand-guide.mjs";
 
 const API_KEY = process.env.ANTHROPIC_API_KEY;
@@ -466,21 +466,26 @@ async function generateTweetPool() {
     model: MODEL_SONNET,
     userPrompt: `美容室経営者向けのX単発ツイートを **14本** 生成してください。
 
-${MASCOT_CHARACTER}
+${SINGLE_TWEET_VOICE}
 
 【内訳】
-- tip系: 5本（マスコット「ぴよ」が気づきを共有する形。具体ノウハウ含む）
-- question系: 5本（「ぴよ」が読者に問いかける形。リプ誘発）
-- observation系: 4本（「ぴよ」が業界を観察してつぶやく形。共感・人柄醸成）
+- tip系: 5本（具体的なノウハウ・行動指針。逆説型か断言型フックで始める）
+- question系: 5本（読者への問いかけ。具体的な状況描写からリプを誘発）
+- observation系: 4本（業界観察・共感・気づき。断言で終わる）
+
+【フック強化ルール】
+- 14本中6本以上は「逆説型」または「意外な視点」で書き出す
+  例: 「新規集客に力を入れるほど経営が苦しくなるサロンがある」
+  例: 「丁寧な接客がリピート率を下げることがある」
 
 【話題プール】（自由に組み合わせ・発想元として使う）
 ${SINGLE_TWEET_TOPICS.join(" / ")}
 
 【重要ルール】
-- 全ツイート「ぴよ」キャラの口調で書く（語尾「〜ぴよ」を1ツイート2〜3回まで、要所で使う）
-- 各ツイートは独立で価値が成立すること（キャラだけで中身がない投稿はNG）
+- 各ツイートは独立で価値が成立すること
 - 14本通して話題を散らすこと（同じ話題2本以上禁止）
-- 各140字以内厳守
+- ブランドガイドのNG表現禁止
+- 各140字以内厳守（ハッシュタグ込みで140字）
 - 1日2本×7日 で投稿される想定なので、時刻違いで連投してもうるさくない
 
 submit_tweet_pool ツールで提出。**tweets フィールドは必ずオブジェクトの配列として直接返すこと（JSON文字列化禁止）。**`,
