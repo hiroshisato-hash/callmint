@@ -1,0 +1,14 @@
+{
+  "generated_at": "2026-05-24T14:27:49.779Z",
+  "week_start": "2026-05-25",
+  "note_topic": "sns_shukyaku",
+  "note_title": "フォロワー1万人でも満席にならない美容室が見落としていること",
+  "x_article_title": "フォロワー1万人でも予約が埋まらないサロンが見落としている本質",
+  "thursday_thread_topic": "スタッフマネジメント",
+  "pipeline": "phase-gamma",
+  "models_used": [
+    "claude-haiku-4-5-20251001",
+    "claude-sonnet-4-6",
+    "claude-opus-4-7"
+  ]
+}
