@@ -1,0 +1,14 @@
+{
+  "generated_at": "2026-05-31T14:47:39.193Z",
+  "week_start": "2026-06-01",
+  "note_topic": "kyakutanka_up",
+  "note_title": "「高いメニューが売れない」は勘違い？選びやすい構成に変えると何が起きるか",
+  "x_article_title": "値上げゼロで客単価を上げる——メニュー構成の見直しがすべての起点",
+  "thursday_thread_topic": "業界トレンド",
+  "pipeline": "phase-gamma",
+  "models_used": [
+    "claude-haiku-4-5-20251001",
+    "claude-sonnet-4-6",
+    "claude-opus-4-7"
+  ]
+}
