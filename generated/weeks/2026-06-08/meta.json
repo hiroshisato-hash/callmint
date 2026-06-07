@@ -1,0 +1,14 @@
+{
+  "generated_at": "2026-06-07T14:55:57.690Z",
+  "week_start": "2026-06-08",
+  "note_topic": "repeat_rate",
+  "note_title": "新規客は来るのにリピートされない——原因は施策不足じゃなかった",
+  "x_article_title": "新規客は来るのにリピートされない——原因は施策じゃなく「記憶と動機の設計」にある",
+  "thursday_thread_topic": "価格設定",
+  "pipeline": "phase-gamma",
+  "models_used": [
+    "claude-haiku-4-5-20251001",
+    "claude-sonnet-4-6",
+    "claude-opus-4-7"
+  ]
+}
