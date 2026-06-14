@@ -1,0 +1,14 @@
+{
+  "generated_at": "2026-06-14T15:11:41.762Z",
+  "week_start": "2026-06-15",
+  "note_topic": "sns_shukyaku",
+  "note_title": "なぜあのサロンはInstagramに力を入れないのに予約が埋まるのか",
+  "x_article_title": "投稿数ゼロでも予約が埋まるサロンが知っている「SNS集客の目的のズレ」",
+  "thursday_thread_topic": "客層分析",
+  "pipeline": "phase-gamma",
+  "models_used": [
+    "claude-haiku-4-5-20251001",
+    "claude-sonnet-4-6",
+    "claude-opus-4-7"
+  ]
+}
