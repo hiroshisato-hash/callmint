@@ -14,7 +14,7 @@ const NOTE_TOPIC_OVERRIDE = process.env.NOTE_TOPIC || ""; // optional
 
 const MODEL_HAIKU = "claude-haiku-4-5-20251001";
 const MODEL_SONNET = "claude-sonnet-4-6";
-const MODEL_OPUS = "claude-opus-4-7";
+const MODEL_OPUS = "claude-opus-4-8";
 
 if (!API_KEY) {
   console.error("ANTHROPIC_API_KEY is not set.");
