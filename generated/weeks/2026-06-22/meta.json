@@ -1,0 +1,14 @@
+{
+  "generated_at": "2026-06-21T15:14:45.529Z",
+  "week_start": "2026-06-22",
+  "note_topic": "kyakutanka_up",
+  "note_title": "電話の第一声で、客単価は決まっているかもしれない",
+  "x_article_title": "客単価の天井、実はメニュー表より「電話の第一声」が作っている",
+  "thursday_thread_topic": "予約取りこぼし",
+  "pipeline": "phase-gamma",
+  "models_used": [
+    "claude-haiku-4-5-20251001",
+    "claude-sonnet-4-6",
+    "claude-opus-4-8"
+  ]
+}
