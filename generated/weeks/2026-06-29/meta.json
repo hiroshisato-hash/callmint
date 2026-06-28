@@ -1,0 +1,14 @@
+{
+  "generated_at": "2026-06-28T14:51:41.908Z",
+  "week_start": "2026-06-29",
+  "note_topic": "repeat_rate",
+  "note_title": "美容室のリピート率、鍵は施術より「電話受付」にあった？",
+  "x_article_title": "初回客がリピートしない本当の理由——施術ではなく「退店体験」に鍵があった",
+  "thursday_thread_topic": "AIの会話づくり",
+  "pipeline": "phase-gamma",
+  "models_used": [
+    "claude-haiku-4-5-20251001",
+    "claude-sonnet-4-6",
+    "claude-opus-4-8"
+  ]
+}
